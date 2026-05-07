@@ -287,7 +287,93 @@ void heapSort(vector<Paciente> &arr, long long &comparacoes, long long &trocas) 
 }
 
 // =========================================================================
-// 3. ALGORITMOS DE BUSCA
+// 3. HASH DUPLO
+//    Endereçamento aberto com duas funções hash.
+//    O tamanho da tabela é o menor primo >= 2*n para manter fator de carga
+//    abaixo de 0.5, o que garante desempenho adequado.
+// =========================================================================
+
+enum EstadoPosicao { VAZIO, OCUPADO, REMOVIDO };
+
+// Retorna true se p é primo
+bool ehPrimo(int p) {
+    if (p < 2) return false;
+    for (int i = 2; i * i <= p; i++)
+        if (p % i == 0) return false;
+    return true;
+}
+
+// Menor primo >= n
+int proximoPrimo(int n) {
+    while (!ehPrimo(n)) n++;
+    return n;
+}
+
+class HashDuplo {
+private:
+    int tamanho;
+    vector<int>           chaves;        // chave = pelvic_incidence
+    vector<int>           indices;       // índice original no vetor de dados
+    vector<EstadoPosicao> estado;
+
+    int hash1(int chave) const { return ((chave % tamanho) + tamanho) % tamanho; }
+    int hash2(int chave) const { return 1 + (chave % (tamanho - 1)); }
+
+public:
+    HashDuplo(int tam)
+        : tamanho(tam), chaves(tam, 0), indices(tam, -1), estado(tam, VAZIO) {}
+
+    void inserir(int chave, int idx_original) {
+        int h1 = hash1(chave);
+        int h2 = hash2(chave);
+        for (int i = 0; i < tamanho; i++) {
+            int pos = (h1 + i * h2) % tamanho;
+            if (estado[pos] == VAZIO || estado[pos] == REMOVIDO) {
+                chaves[pos]  = chave;
+                indices[pos] = idx_original;
+                estado[pos]  = OCUPADO;
+                return;
+            }
+        }
+    }
+
+    int buscar(int chave, long long &comparacoes) const {
+        int h1 = hash1(chave);
+        int h2 = hash2(chave);
+        for (int i = 0; i < tamanho; i++) {
+            int pos = (h1 + i * h2) % tamanho;
+            comparacoes++;
+            if (estado[pos] == VAZIO)                          return -1;
+            if (estado[pos] == OCUPADO && chaves[pos] == chave) return indices[pos];
+        }
+        return -1;
+    }
+};
+
+// Constrói a tabela desde o início (tempo conta a partir da criação)
+// e realiza a busca. Retorna o índice encontrado ou -1.
+int buscaHashDuplo(const vector<Paciente> &arr, int alvo,
+                   long long &comparacoes, double &tempo_s) {
+    int n       = arr.size();
+    int tam_tab = proximoPrimo(2 * n);  // fator de carga < 0.5
+
+    clock_t ini = clock();              // inicia ANTES de criar a tabela
+
+    HashDuplo ht(tam_tab);
+    for (int i = 0; i < n; i++)
+        ht.inserir(arr[i].pelvic_incidence, i);
+
+    comparacoes = 0;
+    int resultado = ht.buscar(alvo, comparacoes);
+
+    clock_t fim = clock();
+    tempo_s = (double)(fim - ini) / CLOCKS_PER_SEC;
+
+    return resultado;
+}
+
+// =========================================================================
+// 4. ALGORITMOS DE BUSCA CLÁSSICOS
 // =========================================================================
 
 int buscaSequencial(const vector<Paciente> &arr, int alvo, long long &comparacoes) {
@@ -313,26 +399,77 @@ int buscaBinaria(const vector<Paciente> &arr, int alvo, long long &comparacoes) 
 }
 
 // =========================================================================
-// 3. LEITURA DO CSV
+// 3. LEITURA DO CSV (GENÉRICA)
 // =========================================================================
 
-vector<Paciente> lerCSV(const string &caminho, string &cabecalho) {
+// Detecta o separador do CSV (vírgula ou ponto-e-vírgula)
+char detectarSeparador(const string &linha) {
+    int contagem_virgula = 0, contagem_ponto_virgula = 0;
+    for (char c : linha) {
+        if (c == ',') contagem_virgula++;
+        if (c == ';') contagem_ponto_virgula++;
+    }
+    return (contagem_ponto_virgula > contagem_virgula) ? ';' : ',';
+}
+
+// Divide uma linha usando o separador fornecido
+vector<string> dividirLinha(const string &linha, char separador) {
+    vector<string> campos;
+    istringstream ss(linha);
+    string campo;
+    while (getline(ss, campo, separador)) {
+        campos.push_back(campo);
+    }
+    return campos;
+}
+
+// Remove espaços em branco do início e fim da string
+string trim(const string &str) {
+    size_t inicio = str.find_first_not_of(" \t\r\n");
+    if (inicio == string::npos) return "";
+    size_t fim = str.find_last_not_of(" \t\r\n");
+    return str.substr(inicio, fim - inicio + 1);
+}
+
+// Lê CSV com suporte a múltiplos separadores e índice de coluna configurável
+vector<Paciente> lerCSV(const string &caminho, string &cabecalho, int indice_coluna = 0) {
     vector<Paciente> dados;
     ifstream arquivo(caminho);
     if (!arquivo.is_open()) { cerr << "Erro: não foi possível abrir " << caminho << endl; exit(1); }
+    
+    // Lê cabeçalho e detecta separador
     getline(arquivo, cabecalho);
+    char separador = detectarSeparador(cabecalho);
+    
+    cerr << "Separador detectado: '" << separador << "'" << endl;
+    
+    // Valida índice da coluna
+    vector<string> colunas = dividirLinha(cabecalho, separador);
+    cerr << "Total de colunas: " << colunas.size() << endl;
+    if (indice_coluna < 0 || indice_coluna >= (int)colunas.size()) {
+        cerr << "Aviso: índice de coluna " << indice_coluna << " inválido. Usando coluna 0." << endl;
+        indice_coluna = 0;
+    }
+    cerr << "Usando coluna " << indice_coluna << ": " << trim(colunas[indice_coluna]) << endl;
+    
     string linha;
+    int linha_numero = 1;
     while (getline(arquivo, linha)) {
         if (linha.empty()) continue;
-        istringstream ss(linha);
-        string campo;
-        getline(ss, campo, ',');
+        linha_numero++;
+        
+        vector<string> campos = dividirLinha(linha, separador);
+        if (indice_coluna >= (int)campos.size()) continue;
+        
+        string campo_valor = trim(campos[indice_coluna]);
         try {
             Paciente p;
-            p.pelvic_incidence = (int)(stod(campo) * 1000.0);
+            p.pelvic_incidence = (int)(stod(campo_valor) * 1000.0);
             p.linha_original = linha;
             dados.push_back(p);
-        } catch (...) {}
+        } catch (...) {
+            cerr << "Aviso: linha " << linha_numero << " não pôde ser processada." << endl;
+        }
     }
     return dados;
 }
@@ -370,10 +507,23 @@ struct ResultadoBusca {
 // =========================================================================
 
 int main(int argc, char *argv[]) {
+    // Uso: ./programa [arquivo.csv] [indice_coluna]
+    // Exemplos:
+    //   ./programa                                    (usa Dataset_spine.csv, coluna 0)
+    //   ./programa dados-cadastrais.csv               (usa dados-cadastrais.csv, coluna 0)
+    //   ./programa dados-cadastrais.csv 0             (coluna CODIGOISIMP)
+    //   ./programa dados-cadastrais.csv 4             (coluna CNPJ)
+    
     string caminho_csv = (argc > 1) ? argv[1] : "Dataset_spine.csv";
+    int indice_coluna = (argc > 2) ? atoi(argv[2]) : 0;
+    
     string cabecalho;
+    
+    cerr << "======================================" << endl;
+    cerr << "Lendo arquivo: " << caminho_csv << endl;
+    cerr << "======================================" << endl;
 
-    vector<Paciente> dados_todos = lerCSV(caminho_csv, cabecalho);
+    vector<Paciente> dados_todos = lerCSV(caminho_csv, cabecalho, indice_coluna);
     int total = dados_todos.size();
     cerr << "Registros carregados: " << total << endl;
 
@@ -416,14 +566,22 @@ int main(int argc, char *argv[]) {
             {2, sub[tam - 1].pelvic_incidence}
         };
 
-        // --- Fase A: desordenado → busca sequencial ---
+        // --- Fase A: desordenado → busca sequencial + hash duplo ---
         for (auto &[pos, alvo] : alvos) {
-            long long c = 0;
-            clock_t ini = clock();
-            int idx = buscaSequencial(sub, alvo, c);
-            clock_t fim = clock();
-            resultados_busca.push_back({"Sequencial", "Desordenado", tam, pos,
-                                        (double)(fim - ini) / CLOCKS_PER_SEC, c, idx});
+            {
+                long long c = 0;
+                clock_t ini = clock();
+                int idx = buscaSequencial(sub, alvo, c);
+                clock_t fim = clock();
+                resultados_busca.push_back({"Sequencial", "Desordenado", tam, pos,
+                                            (double)(fim - ini) / CLOCKS_PER_SEC, c, idx});
+            }
+            {
+                long long c = 0; double tempo = 0;
+                int idx = buscaHashDuplo(sub, alvo, c, tempo);
+                resultados_busca.push_back({"HashDuplo", "Desordenado", tam, pos,
+                                            tempo, c, idx});
+            }
         }
 
         // --- Fase B: desordenado → ordenação ---
@@ -468,6 +626,12 @@ int main(int argc, char *argv[]) {
                 resultados_busca.push_back({"Binaria", "Ordenado_Crescente", tam, pos,
                                             (double)(fim - ini) / CLOCKS_PER_SEC, c, idx});
             }
+            {
+                long long c = 0; double tempo = 0;
+                int idx = buscaHashDuplo(sub_ord_asc, alvo, c, tempo);
+                resultados_busca.push_back({"HashDuplo", "Ordenado_Crescente", tam, pos,
+                                            tempo, c, idx});
+            }
         }
 
         // --- Fase E: ordenar decrescente ---
@@ -481,14 +645,22 @@ int main(int argc, char *argv[]) {
                                       (double)(fim - ini) / CLOCKS_PER_SEC, c, t});
         }
 
-        // --- Fase F: busca sequencial em dados decrescentes ---
+        // --- Fase F: busca sequencial + hash duplo em dados decrescentes ---
         for (auto &[pos, alvo] : alvos) {
-            long long c = 0;
-            clock_t ini = clock();
-            int idx = buscaSequencial(sub_desc, alvo, c);
-            clock_t fim = clock();
-            resultados_busca.push_back({"Sequencial", "Ordenado_Decrescente", tam, pos,
-                                        (double)(fim - ini) / CLOCKS_PER_SEC, c, idx});
+            {
+                long long c = 0;
+                clock_t ini = clock();
+                int idx = buscaSequencial(sub_desc, alvo, c);
+                clock_t fim = clock();
+                resultados_busca.push_back({"Sequencial", "Ordenado_Decrescente", tam, pos,
+                                            (double)(fim - ini) / CLOCKS_PER_SEC, c, idx});
+            }
+            {
+                long long c = 0; double tempo = 0;
+                int idx = buscaHashDuplo(sub_desc, alvo, c, tempo);
+                resultados_busca.push_back({"HashDuplo", "Ordenado_Decrescente", tam, pos,
+                                            tempo, c, idx});
+            }
         }
 
         // --- Fase G: decrescente → ordenação crescente ---

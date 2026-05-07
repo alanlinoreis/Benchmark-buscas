@@ -36,10 +36,10 @@ df_ord = df_ord[df_ord['Algoritmo'] != 'InsertionDesc'].copy()
 
 plt.style.use('ggplot')
 
-CORES     = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#9a6324', '#000075']
-MARCAS    = ['o', 's', '^', 'D', 'v', 'X', 'P', '*']
-LINHAS    = ['-', '--', '-.', ':', '-', '--', '-.', ':']
-GROSSURAS = [2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5]
+CORES     = ['#e6194B', '#3cb44b', '#4363d8', '#f58231', '#911eb4', '#42d4f4', '#9a6324', '#000075', '#469990']
+MARCAS    = ['o', 's', '^', 'D', 'v', 'X', 'P', '*', 'h']
+LINHAS    = ['-', '--', '-.', ':', '-', '--', '-.', ':', '-']
+GROSSURAS = [2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5, 2.5]
 
 def estilo(j):
     return dict(
@@ -150,9 +150,9 @@ def grafico_busca_comparacoes():
 
     salvar('busca_seq_comparacoes.png')
 
-    # --- 4b: Sequencial vs Binária, dados ordenados crescente ---
+    # --- 4b: Sequencial vs Binária vs HashDuplo, dados ordenados crescente ---
     fig, axes = plt.subplots(1, 3, figsize=(21, 6), sharey=False)
-    fig.suptitle('Seq. vs Binária (Ordenado Crescente) — Comparações × N',
+    fig.suptitle('Seq. vs Binária vs HashDuplo (Ordenado Crescente) — Comparações × N',
                  fontsize=15, fontweight='bold')
 
     df_orc = df_bus[df_bus['Fase'] == 'Ordenado_Crescente']
@@ -161,7 +161,7 @@ def grafico_busca_comparacoes():
         ax = axes[col]
         df_pos = df_orc[df_orc['AlvoPos'] == pos]
 
-        for j, tipo in enumerate(['Sequencial', 'Binaria']):
+        for j, tipo in enumerate(['Sequencial', 'Binaria', 'HashDuplo']):
             df_tipo = df_pos[df_pos['TipoBusca'] == tipo].sort_values('N')
             if df_tipo.empty:
                 continue
@@ -176,6 +176,32 @@ def grafico_busca_comparacoes():
         sem_notacao_cientifica(ax)
 
     salvar('busca_seq_vs_bin_comparacoes.png')
+
+    # --- 4c: HashDuplo — comparações por fase e alvo ---
+    fig, axes = plt.subplots(1, 3, figsize=(21, 6), sharey=False)
+    fig.suptitle('HashDuplo — Comparações × N (por fase)', fontsize=15, fontweight='bold')
+
+    df_hash = df_bus[df_bus['TipoBusca'] == 'HashDuplo']
+
+    for col, fase in enumerate(fases_busca_seq):
+        ax = axes[col]
+        df_fase = df_hash[df_hash['Fase'] == fase]
+
+        for j, pos in enumerate(sorted(df_fase['AlvoPos'].unique())):
+            df_alvo = df_fase[df_fase['AlvoPos'] == pos].sort_values('N')
+            if df_alvo.empty:
+                continue
+            ax.plot(df_alvo['N'], df_alvo['Comparacoes'],
+                    label=ROTULOS_ALVO[pos], **estilo(j))
+
+        ax.set_title(ROTULOS_FASE_BUS[fase], fontsize=12)
+        ax.set_xlabel('Número de Registros (N)', fontsize=10)
+        ax.set_ylabel('Comparações (sondagens)', fontsize=10)
+        ax.legend(fontsize=9)
+        ax.grid(True, alpha=0.4)
+        sem_notacao_cientifica(ax)
+
+    salvar('busca_hash_comparacoes.png')
 
 grafico_busca_comparacoes()
 
@@ -211,9 +237,9 @@ def grafico_busca_tempo():
 
     salvar('busca_seq_tempo.png')
 
-    # --- 5b: Sequencial vs Binária, tempo ---
+    # --- 5b: Sequencial vs Binária vs HashDuplo, tempo, dados ordenados crescente ---
     fig, axes = plt.subplots(1, 3, figsize=(21, 6), sharey=False)
-    fig.suptitle('Seq. vs Binária (Ordenado Crescente) — Tempo × N',
+    fig.suptitle('Seq. vs Binária vs HashDuplo (Ordenado Crescente) — Tempo × N',
                  fontsize=15, fontweight='bold')
 
     df_orc = df_bus[df_bus['Fase'] == 'Ordenado_Crescente']
@@ -222,7 +248,7 @@ def grafico_busca_tempo():
         ax = axes[col]
         df_pos = df_orc[df_orc['AlvoPos'] == pos]
 
-        for j, tipo in enumerate(['Sequencial', 'Binaria']):
+        for j, tipo in enumerate(['Sequencial', 'Binaria', 'HashDuplo']):
             df_tipo = df_pos[df_pos['TipoBusca'] == tipo].sort_values('N')
             if df_tipo.empty:
                 continue
@@ -238,6 +264,33 @@ def grafico_busca_tempo():
 
     salvar('busca_seq_vs_bin_tempo.png')
 
+    # --- 5c: HashDuplo — tempo por fase e alvo (inclui custo de construção) ---
+    fig, axes = plt.subplots(1, 3, figsize=(21, 6), sharey=False)
+    fig.suptitle('HashDuplo — Tempo × N por fase (construção + busca)',
+                 fontsize=15, fontweight='bold')
+
+    df_hash = df_bus[df_bus['TipoBusca'] == 'HashDuplo']
+
+    for col, fase in enumerate(fases_busca_seq):
+        ax = axes[col]
+        df_fase = df_hash[df_hash['Fase'] == fase]
+
+        for j, pos in enumerate(sorted(df_fase['AlvoPos'].unique())):
+            df_alvo = df_fase[df_fase['AlvoPos'] == pos].sort_values('N')
+            if df_alvo.empty:
+                continue
+            ax.plot(df_alvo['N'], df_alvo['Tempo(s)'],
+                    label=ROTULOS_ALVO[pos], **estilo(j))
+
+        ax.set_title(ROTULOS_FASE_BUS[fase], fontsize=12)
+        ax.set_xlabel('Número de Registros (N)', fontsize=10)
+        ax.set_ylabel('Tempo (s)', fontsize=10)
+        ax.legend(fontsize=9)
+        ax.grid(True, alpha=0.4)
+        sem_notacao_cientifica(ax)
+
+    salvar('busca_hash_tempo.png')
+
 grafico_busca_tempo()
 
 
@@ -249,7 +302,9 @@ for f in [
     'ord_tempos.png',
     'busca_seq_comparacoes.png',
     'busca_seq_vs_bin_comparacoes.png',
+    'busca_hash_comparacoes.png',
     'busca_seq_tempo.png',
     'busca_seq_vs_bin_tempo.png',
+    'busca_hash_tempo.png',
 ]:
     print(f"  {f}")
