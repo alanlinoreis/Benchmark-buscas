@@ -120,18 +120,19 @@ int particionaLomuto(vector<Registro> &arr, int ini, int fim,
     return i + 1;
 }
 
-void quickSortLomutoRec(vector<Registro> &arr, int ini, int fim,
-                        long long &comparacoes, long long &trocas) {
-    if (ini < fim) {
-        int idx = particionaLomuto(arr, ini, fim, comparacoes, trocas);
-        quickSortLomutoRec(arr, ini, idx - 1, comparacoes, trocas);
-        quickSortLomutoRec(arr, idx + 1, fim, comparacoes, trocas);
-    }
-}
-
 void quickSortLomuto(vector<Registro> &arr, long long &comparacoes, long long &trocas) {
     comparacoes = 0; trocas = 0;
-    if (!arr.empty()) quickSortLomutoRec(arr, 0, arr.size() - 1, comparacoes, trocas);
+    if (arr.empty()) return;
+    vector<pair<int,int>> pilha;
+    pilha.push_back({0, (int)arr.size() - 1});
+    while (!pilha.empty()) {
+        auto [ini, fim] = pilha.back(); pilha.pop_back();
+        if (ini < fim) {
+            int idx = particionaLomuto(arr, ini, fim, comparacoes, trocas);
+            pilha.push_back({ini, idx - 1});
+            pilha.push_back({idx + 1, fim});
+        }
+    }
 }
 
 int particionaHoare(vector<Registro> &arr, int ini, int fim,
@@ -146,18 +147,19 @@ int particionaHoare(vector<Registro> &arr, int ini, int fim,
     }
 }
 
-void quickSortHoareRec(vector<Registro> &arr, int ini, int fim,
-                       long long &comparacoes, long long &trocas) {
-    if (ini < fim) {
-        int idx = particionaHoare(arr, ini, fim, comparacoes, trocas);
-        quickSortHoareRec(arr, ini, idx, comparacoes, trocas);
-        quickSortHoareRec(arr, idx + 1, fim, comparacoes, trocas);
-    }
-}
-
 void quickSortHoare(vector<Registro> &arr, long long &comparacoes, long long &trocas) {
     comparacoes = 0; trocas = 0;
-    if (!arr.empty()) quickSortHoareRec(arr, 0, arr.size() - 1, comparacoes, trocas);
+    if (arr.empty()) return;
+    vector<pair<int,int>> pilha;
+    pilha.push_back({0, (int)arr.size() - 1});
+    while (!pilha.empty()) {
+        auto [ini, fim] = pilha.back(); pilha.pop_back();
+        if (ini < fim) {
+            int idx = particionaHoare(arr, ini, fim, comparacoes, trocas);
+            pilha.push_back({ini, idx});
+            pilha.push_back({idx + 1, fim});
+        }
+    }
 }
 
 // -------------------------------------------------------------------------
